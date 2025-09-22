@@ -25,9 +25,9 @@ def _get_hardcoded_defaults() -> Dict[str, Any]:
             "temporal": {"time": 98},
         },
         "dask": {
-            "n_workers": 4,
+            "n_workers": 2,
             "threads_per_worker": 2,
-            "memory_limit": "2GB",
+            "memory_limit": "4GB",
             "dashboard_address": None,
         },
         "variable_names": {

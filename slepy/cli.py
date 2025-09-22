@@ -1,10 +1,10 @@
 """
 Command-line interface for slepy.
 """
-
 import sys
 import argparse
 from pathlib import Path
+from typing import Literal
 from xarray import DataArray
 
 from .core import SLECalculator
@@ -33,14 +33,9 @@ Examples:
     
     # Required arguments
     parser.add_argument(
-        "thickness_dir",
+        "ensemble_dir",
         type=Path,
-        help="Directory containing thickness netCDF files"
-    )
-    parser.add_argument(
-        "z_base_dir", 
-        type=Path,
-        help="Directory containing bed elevation netCDF files"
+        help="Directory containing netCDF files"
     )
     parser.add_argument(
         "output_file",
@@ -55,16 +50,6 @@ Examples:
         help="Basin mask netCDF file for regional analysis"
     )
     parser.add_argument(
-        "-A", "--areacell",
-        type=Path,
-        help="Grid cell area netCDF file (bypasses automatic area calculation)"
-    )
-    parser.add_argument(
-        "-G", "--grounded-fraction-dir",
-        type=Path,
-        help="Directory containing grounded fraction netCDF files for ensemble processing"
-    )
-    parser.add_argument(
         "-o", "--overwrite",
         action="store_true",
         help="Overwrite output file if it exists"
@@ -75,21 +60,18 @@ Examples:
         help="Suppress all output and progress bars"
     )
     parser.add_argument(
-        "--show-memory",
-        action="store_true",
-        help="Show memory usage during processing (requires psutil)"
+        "-p", "--pole",
+        type=Literal[-1, 1],
+        default=None,
+        help="Pole of the polar stereographic grid: 1 for North Pole, -1 for South Pole"
     )
-    
     return parser
 
 def validate_arg_paths(args) -> None:
     """Validate that provided paths exist and are correct."""
-    if not args.thickness_dir.exists():
-        raise FileNotFoundError(f"Thickness directory not found: {args.thickness_dir}")
-    
-    if not args.z_base_dir.exists():
-        raise FileNotFoundError(f"Z_base directory not found: {args.z_base_dir}")
-    
+    if not args.ensemble_dir.exists():
+        raise FileNotFoundError(f"Directory not found: {args.ensemble_dir}")
+
     if args.output_file.suffix != ".nc":
         raise ValueError("Output file must have .nc extension")
     
@@ -98,13 +80,6 @@ def validate_arg_paths(args) -> None:
     
     if args.mask and not args.mask.exists():
         raise FileNotFoundError(f"Mask file not found: {args.mask}")
-    
-    if args.areacell and not args.areacell.exists():
-        raise FileNotFoundError(f"Areacell file not found: {args.areacell}")
-    
-    if args.grounded_fraction_dir and not args.grounded_fraction_dir.exists():
-        raise FileNotFoundError(f"Grounded fraction directory not found: {args.grounded_fraction_dir}")
- 
 
 def save_results(data: DataArray, output_file: Path, overwrite: bool = False) -> None:
     """
@@ -146,35 +121,25 @@ def main(args=None):
     parser = create_parser()
     args = parser.parse_args(args)
     validate_arg_paths(args)
-    
-    # Load areacell if provided
-    areacell = None
-    if args.areacell:
-        from .utils import load_areacell
-        areacell = load_areacell(args.areacell)
+
 
     # Initialize calculator
-    calc = SLECalculator(areacell=areacell, quiet=args.quiet, show_memory=args.show_memory)
+    calc = SLECalculator(quiet=args.quiet, pole=args.pole)
 
     # Print inputs summary   
     if not args.quiet:
         print("Processing ensemble...")
-        print(f"Thickness dir: {args.thickness_dir}")
-        print(f"Z_base dir: {args.z_base_dir}")
+        print(f"Ensemble dir: {args.ensemble_dir}")
         if args.mask:
             print(f"Basin mask: {args.mask}")
-        if args.areacell:
-            print(f"Areacell file: {args.areacell}")
-        if args.grounded_fraction_dir:
-            print(f"Grounded fraction dir: {args.grounded_fraction_dir}")
+        if args.pole:
+            print(f"Polar Stereographic grid: {'North' if args.pole == 1 else 'South'}")
         print(f"Output: {args.output_file}")
 
     # Calculate SLE 
     sle = calc.process_ensemble(
-        thickness_dir=args.thickness_dir,
-        z_base_dir=args.z_base_dir,
+        ensemble_dir=args.ensemble_dir,
         basins_file=args.mask,
-        grounded_fraction_dir=args.grounded_fraction_dir,
     )
     calc.close() # clean up memory
 
@@ -187,8 +152,6 @@ def main(args=None):
         print(f"  Ensemble size: {sle.sizes['run']} runs")
         if 'basin' in sle.dims:
             print(f"  Basins: {sle.sizes['basin']} basins")
-        
-
 
 if __name__ == "__main__":
     try:

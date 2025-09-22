@@ -3,8 +3,9 @@ Utility functions for data validation and preprocessing.
 """
 import numpy as np
 import xarray as xr
+from typing import Union
 from pathlib import Path
-from xarray import DataArray
+from xarray import DataArray, Dataset
 from typing import Set, Literal
 
 from math import pi
@@ -157,7 +158,7 @@ def xy2ll(
     return lat, lon
     
 
-def scale_factor(da: DataArray, sgn: int) -> DataArray:
+def scale_factor(data: Union[DataArray, Dataset], sgn: int) -> DataArray:
 
     '''
     Calculates the area scale factor for a DataArray on a Polar Stereographic
@@ -172,9 +173,9 @@ def scale_factor(da: DataArray, sgn: int) -> DataArray:
         - DataArray for k, the area scale factor (Geolzer et al., 2020)
     '''
 
-    check_dims(da, {'x', 'y'})
-    x = da.x
-    y = da.y
+    check_dims(data, {'x', 'y'})
+    x = data.x
+    y = data.y
 
     # centre origin on the pole if not already
     xs = x - x.mean()
