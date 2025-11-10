@@ -50,20 +50,26 @@ Examples:
         help="Basin mask netCDF file for regional analysis"
     )
     parser.add_argument(
+        "--pole",
+        type=int,
+        choices=[-1, 1],
+        default=None,
+        help="Pole of the polar stereographic grid: 1 for North Pole, -1 for South Pole"
+    )
+    parser.add_argument(
         "-o", "--overwrite",
         action="store_true",
         help="Overwrite output file if it exists"
     )
     parser.add_argument(
+        "-p", "--parallel",
+        action="store_true",
+        help="Use dask for parallel processing"
+    )
+    parser.add_argument(
         "-q", "--quiet",
         action="store_true",
         help="Suppress all output and progress bars"
-    )
-    parser.add_argument(
-        "-p", "--pole",
-        type=Literal[-1, 1],
-        default=None,
-        help="Pole of the polar stereographic grid: 1 for North Pole, -1 for South Pole"
     )
     return parser
 
@@ -124,7 +130,7 @@ def main(args=None):
 
 
     # Initialize calculator
-    calc = SLECalculator(quiet=args.quiet, pole=args.pole)
+    calc = SLECalculator(pole=args.pole, parallel=args.parallel, quiet=args.quiet)
 
     # Print inputs summary   
     if not args.quiet:
@@ -141,7 +147,7 @@ def main(args=None):
         ensemble_dir=args.ensemble_dir,
         basins_file=args.mask,
     )
-    calc.close() # clean up memory
+    calc.close() # clean up SLECalculator resources
 
     # Save to file
     save_results(sle, args.output_file, overwrite=args.overwrite)
