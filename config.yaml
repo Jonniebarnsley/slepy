@@ -1,33 +1,31 @@
-# SLEpy Configuration File
-# Users can modify these defaults before installing with `pip install -e .`
-# All values have sensible defaults if this file is not present
+# slepy Configuration File
 
 # Physical constants (kg/m³)
 densities:
-  ice: 918.0        # density of ice
-  ocean: 1028.0     # density of seawater  
+  ice: 917.0        # density of ice
+  ocean: 1027.0     # density of seawater  
   water: 1000.0     # density of freshwater
 
-# Ocean surface area (m²) - Gregory et al. (2019)
-ocean_area: 3.625e14
+# Ocean surface area (m²)
+ocean_area: 3.625e14  # Gregory et al. (2019)
 
-# Default chunk sizes for parallel processing (optimized for 8-core systems)
+# Default chunk sizes for parallel processing
 chunks:
   x: 192
   y: 192
-  time: 98
+  time: 147
 
-# Dask worker configuration
+# Dask parallel worker configuration
 dask:
   n_workers: 4
   threads_per_worker: 2
-  memory_limit: "2GB"
-  dashboard_address: null
+  memory_limit: "4GB"
+  dashboard_address: ":8787"
 
 # Default variable names expected in netCDF files
-# Users can customize these to match their data conventions
 variable_names:
   thickness: "thickness"
   bed_elevation: "Z_base"
   grounded_fraction: "grounded_fraction"
-  basin: "basin"
+  basin: "basins"
+  cell_area: "areacello"
