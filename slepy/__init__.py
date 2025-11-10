@@ -9,16 +9,12 @@ __version__ = "1.0.0"
 __author__ = "Jonnie Barnsley"
 
 from .core import SLECalculator
-from .utils import check_alignment, check_dims, scale_factor, load_areacell, load_grounded_fraction
+from .utils import scale_factor
 from .config import DENSITIES, OCEAN_AREA
 
 __all__ = [
     "SLECalculator",
-    "check_alignment",
-    "check_dims",
     "scale_factor",
-    "load_areacell",
-    "load_grounded_fraction",
     "DENSITIES",
     "OCEAN_AREA",
 ]
