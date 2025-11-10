@@ -22,7 +22,7 @@ def _get_hardcoded_defaults() -> Dict[str, Any]:
         "ocean_area": 3.625e14,
         "chunks": {
             "spatial": {"x": 192, "y": 192},
-            "temporal": {"time": 98},
+            "temporal": {"time": 147},
         },
         "dask": {
             "n_workers": 2,
@@ -72,6 +72,6 @@ _CONFIG = load_config()
 DENSITIES: Dict[str, float] = _CONFIG["densities"]
 OCEAN_AREA: float = float(_CONFIG["ocean_area"])
 REQUIRED_DIMS = {"x", "y", "time"}
-CHUNKS = _CONFIG["chunks"] 
-DASK_CONFIG = _CONFIG["dask"]
-VARNAMES = _CONFIG["variable_names"]
+DEFAULT_CHUNKS = _CONFIG["chunks"] 
+DEFAULT_DASK_CONFIG = _CONFIG["dask"]
+DEFAULT_VARNAMES = _CONFIG["variable_names"]
