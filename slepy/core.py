@@ -6,7 +6,6 @@ import xarray as xr
 from pathlib import Path
 from typing import Optional, Literal, Union
 from xarray import DataArray, Dataset
-from dask.distributed import progress
 
 from .config import DENSITIES, OCEAN_AREA, DEFAULT_VARNAMES, DEFAULT_DASK_CONFIG, DEFAULT_CHUNKS
 
@@ -236,6 +235,7 @@ class SLECalculator:
             return ensemble.compute()
         
         # If parallel and not quiet, show progress bar
+        from dask.distributed import progress
         print("Calculating sea level equivalent...")
         dashboard_link = self._client.dashboard_link
         print(f"📊 Dask dashboard: {dashboard_link}")
