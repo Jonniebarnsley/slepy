@@ -202,11 +202,16 @@ class SLECalculator:
         if not ensemble_dir.is_dir():
             raise ValueError(f"Ensemble directory does not exist: {ensemble_dir}")
         files = sorted(ensemble_dir.glob("*.nc"))
+        if len(files) == 0:
+            raise ValueError(f"No netCDF files found in ensemble directory: {ensemble_dir}")
         basins = self._load_basins(basins_file) if basins_file else None
 
         timeseries = []
-        if self.parallel and not self.quiet:
-            print("Loading ensemble data:")
+        if not self.quiet:
+            if self.parallel:
+                print("Loading ensemble data:")
+            else:
+                print("Computing sea level equivalent for file:")
 
         for i, file in enumerate(files, 1):
             if not self.quiet:
