@@ -314,7 +314,7 @@ class SLECalculator:
             if grounded_fraction is not None:
                 grounded_fraction = grounded_fraction.chunk(self.chunks)
 
-         # Fill NaNs in thickness
+        # Fill NaNs in thickness
         thickness = thickness.fillna(0)
 
         return thickness, bed_elevation, grounded_fraction
