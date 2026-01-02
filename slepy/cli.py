@@ -4,7 +4,6 @@ Command-line interface for slepy.
 import sys
 import argparse
 from pathlib import Path
-from typing import Literal
 from xarray import DataArray
 
 from .core import SLECalculator
