@@ -392,6 +392,10 @@ class SLECalculator:
 
     def _calculate_potential_ocean_volume(self, bed_elevation: DataArray) -> DataArray:
         """Calculate sea level contribution from potential ocean volume."""
+        # If bed elevation has no time dimension, POV contribution is zero
+        if 'time' not in bed_elevation.dims:
+            return 0
+        
         v_pov = (-bed_elevation).clip(min=0) * self.cell_area
         sle_pov = -(v_pov - v_pov.isel(time=0)) / self.ocean_area
         
