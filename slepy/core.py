@@ -334,12 +334,18 @@ class SLECalculator:
         scale factor for Polar Stereographic projection and returns DataArray. Otherwise, returns
         float."""
         x = data.x
+        y = data.y
         
         # Handle single pixel case
         if len(x) < 2:
             dx = 1.0  # Default pixel spacing for single pixel
         else:
             dx = float(x[1] - x[0])  # Assumes regularly spaced grid
+        
+        if len(y) < 2:
+            dy = 1.0
+        else:
+            dy = float(y[1] - y[0])
         
         # Import here to avoid circular imports
         k = 1   # default scale factor if no pole is specified
@@ -348,7 +354,7 @@ class SLECalculator:
             k = scale_factor(data, sgn=self.pole)  # sgn=-1 -> South Polar Stereographic
         
         # Grid cell area
-        cell_area = dx**2 / k**2
+        cell_area = dx*dy / k**2
         
         return cell_area
     
