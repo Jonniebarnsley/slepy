@@ -181,13 +181,13 @@ class SLECalculator:
             self,
             ensemble_dir: Union[str,Path],
             basins_file: Optional[Union[str,Path]] = None,
-    ):
+    ) -> Dataset:
         """
         Apply calculate_sle to an ensemble of ice sheet model runs.
 
         Parameters
         ----------
-        ensemnble_dir : str|Path
+        ensemble_dir : str|Path
             Directory containing netCDF files
         basins_file : Optional[str|Path]
             Basin mask netCDF file for regional SLE timeseries
