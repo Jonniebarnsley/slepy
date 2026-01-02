@@ -159,7 +159,7 @@ class SLECalculator:
         if grounded_fraction is None:
             grounded_fraction = self._create_grounded_mask(thickness, bed_elevation).astype(float)
         
-        # Calculate all components lazily
+        # Calculate all components
         sle_af = self._calculate_volume_above_floatation(thickness, bed_elevation, grounded_fraction)
         sle_pov = self._calculate_potential_ocean_volume(bed_elevation)
         sle_den = self._calculate_density_correction(thickness)
