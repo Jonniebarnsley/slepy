@@ -13,7 +13,7 @@ cd slepy-project
 
 # 2. (Optional) Customize defaults by editing config.yaml
 
-# 3. Create and activate virtual environment
+# 3. (Optional) Create and activate virtual environment
 python -m venv slepy-env
 source slepy-env/bin/activate  # On Windows: slepy-env\Scripts\activate
 
@@ -53,12 +53,25 @@ from slepy import SLECalculator
 
 # Simple calculation on xarray DataArray objects
 with SLECalculator() as calc:
-    sle = calc.calculate_sle(thickness_da, z_base_da)
+    sle = calc.calculate_sle(thickness, bed_elevation)
 
 # Ensemble processing data directories
 with SLECalculator() as calc:
-    results = calc.process_ensemble("data/", mask_file="basins.nc")
+    results = calc.process_ensemble("data/", basins_file="basins.nc")
 ```
+
+### Grounded fraction and Cell area
+
+Optionally, the netcdf files in `data/` can include a `grounded_fraction` variable to account for partial grounding (0=floating, 1=grounded). If this is missing, a binary grounded mask is
+calculated using the floatation criterion in each cell.
+
+Additionally, if a `cell_area` variable is present, it will be used in place of the default
+behaviour, which is to calculate cell area from grid spacing. N.B. this calculation assumes
+a regular, rectangular grid.
+
+For ensemble processing, cell area is cached from the first ensemble member (whether provided or
+calculated) and reused for subsequent members. All ensemble members must therefore share the same
+grid.
 
 ## Advanced Usage
 
