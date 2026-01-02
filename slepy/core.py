@@ -269,9 +269,6 @@ class SLECalculator:
         for ts in timeseries:
             times = np.append(times, ts.time.values)
         unique_times = sorted(np.unique(times))
-        import pandas as pd
-        test = pd.to_datetime(unique_times)
-        print(test[test.duplicated()])
         # Reindex each timeseries to the union time grid
         aligned_timeseries = []
         for ts in timeseries:
