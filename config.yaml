@@ -27,5 +27,5 @@ variable_names:
   thickness: "thickness"
   bed_elevation: "Z_base"
   grounded_fraction: "grounded_fraction"
-  basin: "basins"
+  basin: "basin"
   cell_area: "areacello"
