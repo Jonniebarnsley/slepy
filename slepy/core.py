@@ -303,28 +303,30 @@ class SLECalculator:
         using specified variable names and chunking from config.
         """
         
-        # Open file and load variables
-        with xr.open_dataset(file) as ds:
-            thickness = ds[self.varnames["thickness"]]
-            bed_elevation = ds[self.varnames["bed_elevation"]]
+        # Open file with chunking for parallel processing, or load into memory
+        ds = xr.open_dataset(file, chunks=self.chunks if self.parallel else None)
+        
+        thickness = ds[self.varnames["thickness"]]
+        bed_elevation = ds[self.varnames["bed_elevation"]]
 
-            # Load grounded fraction if available
-            grounded_fraction = None
-            grounded_fraction_name = self.varnames["grounded_fraction"]
-            if grounded_fraction_name in ds:
-                grounded_fraction = ds[grounded_fraction_name]
+        # Load grounded fraction if available
+        grounded_fraction = None
+        grounded_fraction_name = self.varnames["grounded_fraction"]
+        if grounded_fraction_name in ds:
+            grounded_fraction = ds[grounded_fraction_name]
 
-            # Load cell area if available and not already cached
-            cell_area_name = self.varnames["cell_area"]
-            if self.cell_area is None and cell_area_name in ds:
-                self.cell_area = ds[cell_area_name]
+        # Load cell area if available and not already cached
+        cell_area_name = self.varnames["cell_area"]
+        if self.cell_area is None and cell_area_name in ds:
+            self.cell_area = ds[cell_area_name].load()  # Load into memory
 
-        # Chunk data for parallel processing
-        if self.parallel:
-            thickness = thickness.chunk(self.chunks)
-            bed_elevation = bed_elevation.chunk(self.chunks)
-            if grounded_fraction is not None:
-                grounded_fraction = grounded_fraction.chunk(self.chunks)
+        # For non-parallel, load into memory and close file
+        if not self.parallel:
+           thickness = thickness.load()
+           bed_elevation = bed_elevation.load()
+           if grounded_fraction is not None:
+               grounded_fraction = grounded_fraction.load()
+           ds.close()
 
         # Fill NaNs in thickness
         thickness = thickness.fillna(0)
@@ -333,12 +335,10 @@ class SLECalculator:
 
     def _load_basins(self, mask_file: Union[str,Path]) -> DataArray:
         """Load basin mask for regional analysis."""
-        with xr.open_dataset(mask_file) as ds:
-            basins = ds[self.varnames["basin"]]
-        if self.parallel:
-            chunks = self.chunks.copy()
-            chunks.pop("time", None)  # remove time chunking for mask
-            basins = basins.chunk(chunks)
+        chunks = self.chunks.copy()
+        chunks.pop("time", None)  # remove time chunking for mask
+        ds = xr.open_dataset(mask_file, chunks=chunks if self.parallel else None)
+        basins = ds[self.varnames["basin"]]
         return basins
 
     def _calculate_cell_area(self, data: Union[DataArray, Dataset]) -> Union[DataArray, float]:
