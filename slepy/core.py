@@ -204,7 +204,9 @@ class SLECalculator:
         files = sorted(ensemble_dir.glob("*.nc"))
         if len(files) == 0:
             raise ValueError(f"No netCDF files found in ensemble directory: {ensemble_dir}")
-        basins = self._load_basins(basins_file) if basins_file else None
+        if basins_file:
+            basins = self._load_basins(basins_file)
+            basinIDs = np.unique(basins.data).compute()
 
         timeseries = []
         if not self.quiet:
@@ -221,9 +223,10 @@ class SLECalculator:
             sle_grid = self.calculate_sle(thickness, bed_elevation, grounded_fraction, sum=False)
             del thickness, bed_elevation, grounded_fraction
 
-            # Before summing over spatial dimensions, apply basin mask (if provided)
-            if basins is not None:
-                ts = sle_grid.groupby(basins).sum()
+            if basins_file:
+                # groupby causes massive dask graph explosion, so use flox for efficient basin sums
+                from flox.xarray import xarray_reduce
+                ts = xarray_reduce(sle_grid, basins, func="sum", expected_groups=(basinIDs,))
             else:
                 ts = sle_grid.sum(dim=["x", "y"])
             timeseries.append(ts)
@@ -235,6 +238,7 @@ class SLECalculator:
         if not self.parallel:
             return ensemble
 
+        # If parallel, persist and compute
         ensemble = ensemble.persist()
         if self.quiet:
             return ensemble.compute()
@@ -242,6 +246,9 @@ class SLECalculator:
         # If parallel and not quiet, show progress bar
         from dask.distributed import progress
         print("Calculating sea level equivalent...")
+        n_chunks = np.prod(ensemble.data.numblocks)
+        n_tasks = len(ensemble.__dask_graph__())
+        print(f"Dask graph: {n_tasks:,} tasks, {n_chunks:,} chunks")
         dashboard_link = self._client.dashboard_link
         print(f"📊 Dask dashboard: {dashboard_link}")
         progress(ensemble)
@@ -297,7 +304,7 @@ class SLECalculator:
         """
         
         # Open file and load variables
-        with xr.open_dataset(file, engine="netcdf4") as ds:
+        with xr.open_dataset(file) as ds:
             thickness = ds[self.varnames["thickness"]]
             bed_elevation = ds[self.varnames["bed_elevation"]]
 
@@ -311,7 +318,7 @@ class SLECalculator:
             cell_area_name = self.varnames["cell_area"]
             if self.cell_area is None and cell_area_name in ds:
                 self.cell_area = ds[cell_area_name]
-            
+
         # Chunk data for parallel processing
         if self.parallel:
             thickness = thickness.chunk(self.chunks)
@@ -324,10 +331,15 @@ class SLECalculator:
 
         return thickness, bed_elevation, grounded_fraction
 
-    def _load_basins(self, mask_file: Path) -> DataArray:
+    def _load_basins(self, mask_file: Union[str,Path]) -> DataArray:
         """Load basin mask for regional analysis."""
         with xr.open_dataset(mask_file) as ds:
-            return ds[self.varnames["basin"]]
+            basins = ds[self.varnames["basin"]]
+        if self.parallel:
+            chunks = self.chunks.copy()
+            chunks.pop("time", None)  # remove time chunking for mask
+            basins = basins.chunk(chunks)
+        return basins
 
     def _calculate_cell_area(self, data: Union[DataArray, Dataset]) -> Union[DataArray, float]:
         """Get area of each grid cell in m². Assumes even-gridded data. If pole is set, applies
