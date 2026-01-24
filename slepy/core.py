@@ -116,7 +116,7 @@ class SLECalculator:
         """Context manager exit - clean up dask resources."""
         self.close()
         
-    def calculate_sle(
+    def compute_sle(
         self, 
         thickness: DataArray, 
         bed_elevation: DataArray,
@@ -220,7 +220,7 @@ class SLECalculator:
                 print(f"    Run {i}/{len(files)}: {file.stem}")
             
             thickness, bed_elevation, grounded_fraction = self._load_run_data(file)
-            sle_grid = self.calculate_sle(thickness, bed_elevation, grounded_fraction, sum=False)
+            sle_grid = self.compute_sle(thickness, bed_elevation, grounded_fraction, sum=False)
             del thickness, bed_elevation, grounded_fraction
 
             if basins_file:
@@ -239,6 +239,8 @@ class SLECalculator:
             return ensemble
 
         # If parallel, persist and compute
+        n_chunks = np.prod(ensemble.data.numblocks)
+        n_tasks = len(ensemble.__dask_graph__())
         ensemble = ensemble.persist()
         if self.quiet:
             return ensemble.compute()
@@ -246,8 +248,6 @@ class SLECalculator:
         # If parallel and not quiet, show progress bar
         from dask.distributed import progress
         print("Calculating sea level equivalent...")
-        n_chunks = np.prod(ensemble.data.numblocks)
-        n_tasks = len(ensemble.__dask_graph__())
         print(f"Dask graph: {n_tasks:,} tasks, {n_chunks:,} chunks")
         dashboard_link = self._client.dashboard_link
         print(f"📊 Dask dashboard: {dashboard_link}")
