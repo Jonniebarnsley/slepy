@@ -218,7 +218,7 @@ class SLECalculator:
                 from dask.distributed import progress
                 n_tasks = len(sle_grid.__dask_graph__())
                 n_chunks = np.prod(sle_grid.data.numblocks)
-                print(f"Computing SLE grid: {n_tasks:,} tasks, {n_chunks:,} chunks")
+                print(f"Computing SLE: {n_tasks:,} tasks, {n_chunks:,} chunks")
                 print(f"📊 Dask dashboard: {self._client.dashboard_link}")
                 sle_grid = sle_grid.persist()
                 progress(sle_grid)
@@ -228,6 +228,8 @@ class SLECalculator:
         if basins_file:
             # xarray groupby creates huge dask graphs. Use flox instead for efficient basin sums.
             from flox.xarray import xarray_reduce
+            if not self.quiet:
+                print("Dividing into basins...")
             basins = self._load_basins(basins_file)
             basinIDs = np.unique(basins.data).compute()
             sle = xarray_reduce(sle_grid, basins, func="sum", expected_groups=(basinIDs,))
