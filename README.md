@@ -53,7 +53,7 @@ from slepy import SLECalculator
 
 # Simple calculation on xarray DataArray objects
 with SLECalculator() as calc:
-    sle = calc.calculate_sle(thickness, bed_elevation)
+    sle = calc.compute_sle(thickness, bed_elevation)
 
 # Ensemble processing data directories
 with SLECalculator() as calc:
