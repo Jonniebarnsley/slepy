@@ -211,42 +211,36 @@ class SLECalculator:
         thickness = ds[self.varnames["thickness"]]
         bed_elevation = ds[self.varnames["bed_elevation"]]
         sle_grid = self.compute_sle(thickness, bed_elevation, sum=False)
+        
+        # Intermediate compute after SLE grid computation (the heavy lifting)
+        if self.parallel:
+            if not self.quiet:
+                from dask.distributed import progress
+                n_tasks = len(sle_grid.__dask_graph__())
+                n_chunks = np.prod(sle_grid.data.numblocks)
+                print(f"Computing SLE grid: {n_tasks:,} tasks, {n_chunks:,} chunks")
+                print(f"📊 Dask dashboard: {self._client.dashboard_link}")
+                sle_grid = sle_grid.persist()
+                progress(sle_grid)
+            else:
+                sle_grid = sle_grid.persist()
 
         if basins_file:
             # xarray groupby creates huge dask graphs. Use flox instead for efficient basin sums.
             from flox.xarray import xarray_reduce
             basins = self._load_basins(basins_file)
-            basinIDs = np.unique(basins.data).compute() if self.parallel else np.unique(basins.data)
+            basinIDs = np.unique(basins.data).compute()
             sle = xarray_reduce(sle_grid, basins, func="sum", expected_groups=(basinIDs,))
         else:
             sle = sle_grid.sum(dim=["x", "y"])
-         
-        if not self.parallel:
-            return sle.compute()
-
-        # If parallel, persist and compute
-        n_chunks = np.prod(sle.data.numblocks)
-        n_tasks = len(sle.__dask_graph__())
-        sle = sle.persist()
-        if self.quiet:
-            return sle.compute()
         
-        # If parallel and not quiet, show progress bar
-        from dask.distributed import progress
-        print("Calculating sea level equivalent...")
-        print(f"Dask graph: {n_tasks:,} tasks, {n_chunks:,} chunks")
-        dashboard_link = self._client.dashboard_link
-        print(f"📊 Dask dashboard: {dashboard_link}")
-        progress(sle)
-        sle = sle.compute()
-        print(f"Completed processing {len(files)} ensemble runs")
-        return sle
+        return sle.compute()
 
     def _load_basins(self, mask_file: Union[str,Path]) -> DataArray:
         """Load basin mask for regional analysis."""
         chunks = self.chunks.copy()
         chunks.pop("time", None)  # remove time chunking for mask
-        ds = xr.open_dataset(mask_file, chunks=chunks if self.parallel else None)
+        ds = xr.open_dataset(mask_file, chunks=chunks)
         basins = ds[self.varnames["basin"]]
         return basins
 
@@ -258,17 +252,9 @@ class SLECalculator:
         y = data.y
         
         # Handle single pixel case
-        if len(x) < 2:
-            dx = 1.0  # Default pixel spacing for single pixel
-        else:
-            dx = float(x[1] - x[0])  # Assumes regularly spaced grid
+        dx = float(x[1] - x[0]) if len(x) >= 2 else 1.0
+        dy = float(y[1] - y[0]) if len(y) >= 2 else 1.0
         
-        if len(y) < 2:
-            dy = 1.0
-        else:
-            dy = float(y[1] - y[0])
-        
-        # Import here to avoid circular imports
         k = 1   # default scale factor if no pole is specified
         if self.pole:
             from .utils import scale_factor
@@ -276,7 +262,6 @@ class SLECalculator:
         
         # Grid cell area
         cell_area = dx*dy / k**2
-        
         return cell_area
     
     def _create_grounded_mask(
