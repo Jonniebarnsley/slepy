@@ -28,6 +28,7 @@ dependencies = [
     "xarray>=2022.3.0",
     "dask[distributed]>=2022.3.0",
     "netcdf4>=1.5.0",
+    "h5netcdf>=1.0.0",
     "pyyaml>=6.0",
     "pathlib",
     "psutil>=5.8.0",

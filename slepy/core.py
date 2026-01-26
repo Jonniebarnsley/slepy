@@ -204,46 +204,32 @@ class SLECalculator:
         files = sorted(ensemble_dir.glob("*.nc"))
         if len(files) == 0:
             raise ValueError(f"No netCDF files found in ensemble directory: {ensemble_dir}")
+        
+        # Open all files lazily with dask for parallel processing
+        ds = xr.open_mfdataset(files, combine="nested", parallel=True, chunks=self.chunks,
+                               concat_dim="run", engine="h5netcdf")
+        thickness = ds[self.varnames["thickness"]]
+        bed_elevation = ds[self.varnames["bed_elevation"]]
+        sle_grid = self.compute_sle(thickness, bed_elevation, sum=False)
+
         if basins_file:
+            # xarray groupby creates huge dask graphs. Use flox instead for efficient basin sums.
+            from flox.xarray import xarray_reduce
             basins = self._load_basins(basins_file)
-            basinIDs = np.unique(basins.data).compute()
-
-        timeseries = []
-        if not self.quiet:
-            if self.parallel:
-                print("Loading ensemble data:")
-            else:
-                print("Computing sea level equivalent for file:")
-
-        for i, file in enumerate(files, 1):
-            if not self.quiet:
-                print(f"    Run {i}/{len(files)}: {file.stem}")
-            
-            thickness, bed_elevation, grounded_fraction = self._load_run_data(file)
-            sle_grid = self.compute_sle(thickness, bed_elevation, grounded_fraction, sum=False)
-            del thickness, bed_elevation, grounded_fraction
-
-            if basins_file:
-                # groupby causes massive dask graph explosion, so use flox for efficient basin sums
-                from flox.xarray import xarray_reduce
-                ts = xarray_reduce(sle_grid, basins, func="sum", expected_groups=(basinIDs,))
-            else:
-                ts = sle_grid.sum(dim=["x", "y"])
-            timeseries.append(ts)
-            
-        # Combine into ensemble with aligned time dimensions
-        run_labels = range(1, len(timeseries) + 1)
-        ensemble = self._concat_timeseries(timeseries, run_labels)
+            basinIDs = np.unique(basins.data).compute() if self.parallel else np.unique(basins.data)
+            sle = xarray_reduce(sle_grid, basins, func="sum", expected_groups=(basinIDs,))
+        else:
+            sle = sle_grid.sum(dim=["x", "y"])
          
         if not self.parallel:
-            return ensemble
+            return sle.compute()
 
         # If parallel, persist and compute
-        n_chunks = np.prod(ensemble.data.numblocks)
-        n_tasks = len(ensemble.__dask_graph__())
-        ensemble = ensemble.persist()
+        n_chunks = np.prod(sle.data.numblocks)
+        n_tasks = len(sle.__dask_graph__())
+        sle = sle.persist()
         if self.quiet:
-            return ensemble.compute()
+            return sle.compute()
         
         # If parallel and not quiet, show progress bar
         from dask.distributed import progress
@@ -251,87 +237,10 @@ class SLECalculator:
         print(f"Dask graph: {n_tasks:,} tasks, {n_chunks:,} chunks")
         dashboard_link = self._client.dashboard_link
         print(f"📊 Dask dashboard: {dashboard_link}")
-        progress(ensemble)
-        ensemble = ensemble.compute()
-        print(f"Completed processing {len(timeseries)} ensemble runs")
-        return ensemble
-    
-    def _concat_timeseries(self, timeseries, run_labels):
-        """
-        Align time dimensions and concatenate timeseries with different time lengths.
-        
-        This method creates a union of all time coordinates and reindexes each
-        timeseries to this common time grid, filling missing values with NaN.
-        
-        Parameters
-        ----------
-        timeseries_list : list of xarray.DataArray
-            List of timeseries DataArrays with potentially different time dimensions
-        run_labels : range or list
-            Labels for the run dimension
-            
-        Returns
-        -------
-        xarray.DataArray
-            Concatenated timeseries with aligned time dimensions
-        """
-            
-        # Get all unique time coordinates
-        times = np.array([])
-        for ts in timeseries:
-            times = np.append(times, ts.time.values)
-        unique_times = sorted(np.unique(times))
-        # Reindex each timeseries to the union time grid
-        aligned_timeseries = []
-        for ts in timeseries:
-            # Reindex to union time coordinates, filling missing values with NaN
-            aligned_ts = ts.reindex(time=unique_times, fill_value=np.nan)
-            aligned_timeseries.append(aligned_ts)
-        
-        # Now concatenate along run dimension
-        ensemble = xr.concat(aligned_timeseries, dim="run")
-        ensemble = ensemble.assign_coords(run=run_labels)
-
-        return ensemble
-
-    def _load_run_data(
-            self,
-            file: Union[str,Path],
-    ):
-        """
-        Loads thickness, bed elevation, and optionally grounded fraction data for a single run,
-        using specified variable names and chunking from config.
-        """
-        
-        # Open file with chunking for parallel processing, or load into memory
-        ds = xr.open_dataset(file, chunks=self.chunks if self.parallel else None)
-        
-        thickness = ds[self.varnames["thickness"]]
-        bed_elevation = ds[self.varnames["bed_elevation"]]
-
-        # Load grounded fraction if available
-        grounded_fraction = None
-        grounded_fraction_name = self.varnames["grounded_fraction"]
-        if grounded_fraction_name in ds:
-            grounded_fraction = ds[grounded_fraction_name]
-
-        # Load cell area if available and not already cached
-        cell_area_name = self.varnames["cell_area"]
-        if self.cell_area is None and cell_area_name in ds:
-            self.cell_area = ds[cell_area_name].load()  # Load into memory
-
-        # For non-parallel, load into memory and close file
-        if not self.parallel:
-           thickness = thickness.load()
-           bed_elevation = bed_elevation.load()
-           if grounded_fraction is not None:
-               grounded_fraction = grounded_fraction.load()
-           ds.close()
-
-        # Fill NaNs in thickness
-        thickness = thickness.fillna(0)
-
-        return thickness, bed_elevation, grounded_fraction
+        progress(sle)
+        sle = sle.compute()
+        print(f"Completed processing {len(files)} ensemble runs")
+        return sle
 
     def _load_basins(self, mask_file: Union[str,Path]) -> DataArray:
         """Load basin mask for regional analysis."""
